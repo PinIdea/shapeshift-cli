@@ -1,4 +1,4 @@
-# ShapeShift-cmd
+# shapeshift-cli
 
 Exchange cyrptocurrencies using command line interface with ShapeShift.io
 
@@ -17,7 +17,7 @@ exchange cyrptocurrencies using command line interface with ShapeShift.io
 
 positional arguments:
   pair_to_exchange   what coins are being exchanged in the form [input
-                     coin]_[output coin] ie btc_ltc
+                     coin]_[output coin] ie DASH_BTC
   withdraw_address   the address for resulting coin to be sent to
   refund_address     address to return deposit to if anything goes wrong with
                      exchange
@@ -33,6 +33,11 @@ EXAMPLES
 		./shapeshift-cli.py DASH_BTC <withdraw_address> <refund_address> 1.5 dash-cli
 		trade DASH for 1.5 BTC. use dash-cli
 ```
+
+#TODO
+
+Automatically split larger amount to separated and rather small transactions that
+within shapeshift's limits.
 
 #Disclamer:
 

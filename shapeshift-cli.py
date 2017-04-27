@@ -4,6 +4,7 @@
 # ShapeShift-cmd : Exchanging cryptocurrencies using command line with Shapeshift.io
 #
 # Copyright © 2016 Chiheb Nexus
+# Copyright © 2017 Tomasen
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -63,7 +64,7 @@ class ShapeShiftCmd:
         parser.add_argument('-y', action='store_true', dest='skip_confirmation', default=False,
                             help='attemp to proceed without prompting for confirmation')
         parser.add_argument('pair_to_exchange', type=str,
-                            help="what coins are being exchanged in the form [input coin]_[output coin]  ie btc_ltc")
+                            help="what coins are being exchanged in the form [input coin]_[output coin]  ie DASH_BTC")
         parser.add_argument('withdraw_address', type=str,
                             help="the address for resulting coin to be sent to")
         parser.add_argument('refund_address', type=str,
