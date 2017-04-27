@@ -59,17 +59,19 @@ class ShapeShiftCmd:
         pair_to_exchange, withdraw_address, deposit_address, refund_address = "", "", "", ""
 
         parser = argparse.ArgumentParser(
-            description='Exchange cyrptocurrencies using command line with ShapeShift.io')
+            description='exchange cyrptocurrencies using command line interface with ShapeShift.io')
+        parser.add_argument('-y', action='store_true', dest='skip_confirmation', default=False,
+                            help='attemp to proceed without prompting for confirmation')
         parser.add_argument('pair_to_exchange', type=str,
-                            help="coin's symbols to be exchaned")
+                            help="what coins are being exchanged in the form [input coin]_[output coin]  ie btc_ltc")
         parser.add_argument('withdraw_address', type=str,
-                            help="withdraw_address")
+                            help="the address for resulting coin to be sent to")
         parser.add_argument('refund_address', type=str,
-                            help="refund_address")
+                            help="address to return deposit to if anything goes wrong with exchange")
         parser.add_argument('amount_to_be_exchanged', type=float,
-                            help='amount to be exchanged')
+                            help='the amount to be sent to the withdrawal address')
         parser.add_argument('wallet_cli', type=str, nargs='?',
-                            help="wallet control command")
+                            help="the path or excutable command of your wallet client, such as: dash-cli bitcoin-cli")
 
         args = parser.parse_args()
 
@@ -78,9 +80,44 @@ class ShapeShiftCmd:
         refund_address = args.refund_address
         amount_to_be_exchanged = args.amount_to_be_exchanged
         wallet_cli = args.wallet_cli
+        skip_confirmation = args.skip_confirmation
 
-        # TODO: check wallet cli existense
-        self.safe_exit()
+        while True:
+            try:
+                if self.validate_address(self.url_valid_address, withdraw_address, pair_to_exchange.split("_")[1]):
+                    print(" |-> Your withdraw address is valid")
+                    break
+                else:
+                    print("Enter a valid {0} address".format(
+                        pair_to_exchange.split("_")[1]))
+            except Exception as ex:
+                print("Cannot validate your withdraw address.\nProgram will exit")
+                self.safe_exit()
+
+        #  double check withdraw_address
+        if not skip_confirmation and not self.query_yes_no('the resulting coin to be sent to \x1B[33;10m{0}\x1B[0m'
+                                                           .format(withdraw_address), "no"):
+            self.safe_exit()
+
+        while True:
+            try:
+                if refund_address == "":
+                    refund_address = None
+                    break
+                if self.validate_address(self.url_valid_address, refund_address, pair_to_exchange.split("_")[0]):
+                    print(" |-> Your refund address is valid")
+                    break
+                else:
+                    print("Enter a valid {0} address".format(
+                        pair_to_exchange.split("_")[0]))
+            except Exception as ex:
+                print("Cannot validate your refund address.\nProgram will exit")
+
+        # double check refund_address
+        if not skip_confirmation and not self.query_yes_no('if anything goes wrong with exchange,' +
+                                                           'your deposit will be sent to \x1B[33;10m{0}\x1B[0m'
+                                                           .format(withdraw_address), "no"):
+            self.safe_exit()
 
         try:
             print("[+] Printing ShapeShift.io market price for {0}/{1}".format(pair_to_exchange.split("_")[0],
@@ -92,42 +129,34 @@ class ShapeShiftCmd:
             print("Program will exit")
             self.safe_exit()
 
-        while True:
-            try:
-                if self.validate_address(self.url_valid_address, withdraw_address, pair_to_exchange.split("_")[1]):
-                    print(" |-> Your address is valid")
-                    break
-                else:
-                    print("Enter a valid {0} address".format(
-                        pair_to_exchange.split("_")[1]))
-            except Exception as ex:
-                print("Cannot validate your address.\nProgram will exit")
-                self.safe_exit()
-
-        # TODO: double check withdraw_address
-
-        while True:
-            try:
-                if refund_address == "":
-                    refund_address = None
-                    break
-                if self.validate_address(self.url_valid_address, refund_address, pair_to_exchange.split("_")[0]):
-                    print(" |-> Your address is valid")
-                    break
-                else:
-                    print("Enter a valid {0} address".format(
-                        pair_to_exchange.split("_")[0]))
-            except Exception as ex:
-                print("Cannot validate your address.\nProgram will exit")
-
-        # TODO: double check withdraw_address
-
         try:
-            deposit_address = self.post_exchange_request(self.url_send_amount, pair_to_exchange, withdraw_address,
-                                                         amount_to_be_exchanged, refund_address)
-            print(deposit_address)
+            deposit_address, deposit_amount, depositType = \
+                self.post_exchange_request(self.url_send_amount, pair_to_exchange,
+                                           withdraw_address, amount_to_be_exchanged,
+                                           refund_address)
+
+            # check wallet cli existense
+            if wallet_cli is not None:
+                print(
+                    "Excuting: dash-cli sendtoaddress \"{0}\" {1}".format(deposit_address, deposit_amount))
+                ret = call([wallet_cli, "sendtoaddress",
+                            deposit_address, deposit_amount])
+                if ret != 0:
+                    if ret < 0:
+                        print("Killed by signal", -ret)
+                    else:
+                        print("Command failed with return code", ret)
+                else:
+                    print("SUCCESS!!")
+            else:
+                print("---------------------------------------------------")
+                print("Please deposit \x1B[31;10m{2}\x1B[0m {1} to this address:\t \x1B[31; 10m{0}\x1B[0m."
+                      .format(deposit_address, depositType, deposit_amount))
+                print("---------------------------------------------------")
+
             self.transaction_status(self.url_tx_status, deposit_address)
         except Exception as ex:
+            print("Error: " + ex)
             print("Cannot figure the transaction status.\nProgram will exit")
             self.safe_exit()
 
@@ -238,9 +267,12 @@ class ShapeShiftCmd:
 
         return data["isvalid"]
 
-    def post_exchange_request(self, url, pair, withdraw_add, amount, return_address=None, dest_tag=None, rs_address=None):
+    def post_exchange_request(self, url, pair, withdraw_add, amount, return_address=None,
+                              dest_tag=None, rs_address=None):
         """
         """
+        depositType, withdrawType = pair.split("_")
+
         post_data = {"pair": pair, "withdrawal": withdraw_add, "returnAddress": return_address,
                      "destTag": dest_tag, "rsAdress": rs_address, "amount": amount}
 
@@ -250,26 +282,20 @@ class ShapeShiftCmd:
 
         response = urlopen(request)
         content = response.read()
-        print(content)
+
         data_o = loads(content.decode("UTF-8"))
         data = data_o["success"]
 
-        print(data)
-        print("You'll deposit \x1B[31;10m{0}\x1B[0m DASH to get \x1B[33;10m{1}\x1B[0m BTC.".format(
-            data["depositAmount"], data["withdrawalAmount"]))
-        print("Please deposit your DASH to this address:\t \x1B[31;10m{0}\x1B[0m".format(
-            data["deposit"]))
-        print("Your \x1B[33;10m{0}\x1B[0m BTC will be send to this address:\t \x1B[37;10m{1}\x1B[0m".format(
-            data["withdrawalAmount"], data["withdrawal"]))
-        if return_address != None:
-            print("Your DASH refund address is: \x1B[37;10m{0}\x1B[0m".format(
-                return_address))
+        print("Deposit \x1B[31;10m{0}\x1B[0m {1} to this address:\t \x1B[31;10m{2}\x1B[0m,".format(
+            data["depositAmount"], depositType, data["deposit"]))
 
-        print("excuting: dash-cli sendtoaddress \"{0}\" {1}".format(
-            data["deposit"], data["depositAmount"]))
+        print("Your \x1B[33;10m{0}\x1B[0m {1} will be send to this address:\t \x1B[37;10m{2}\x1B[0m".format(
+            data["withdrawalAmount"], withdrawType, data["withdrawal"]))
+        if return_address is not None:
+            print("Your {0} refund address is:\t \x1B[37;10m{1}\x1B[0m".format(
+                depositType, return_address))
 
-        call(["dash-cli", "sendtoaddress", data["deposit"], data["depositAmount"]])
-        return data["deposit"]
+        return data["deposit"], data["depositAmount"], depositType
 
     def transaction_status(self, url, address):
         """
@@ -279,7 +305,6 @@ class ShapeShiftCmd:
         while True:
             data = self.load_url_data(url + address)
 
-            print(data)
             if data["status"] == "no_deposits":
                 if sleeping_time_sec == 600:
                     print("\nExit with status: ", data["status"])
@@ -307,9 +332,43 @@ class ShapeShiftCmd:
 [-] Transaction ID: {6}".format(data["address"], data["withdraw"], data["incomingCoin"],
                                 data["incomingType"], data["outgoingCoin"], data["outgoingType"], data["transaction"]))
                 break
+            else:
+                print("unknown transaction status:", data["status"])
 
             sleeping_time_sec += 5
             time.sleep(5)
+
+    def query_yes_no(self, question, default="yes"):
+        """Ask a yes/no question via raw_input() and return their answer.
+
+        "question" is a string that is presented to the user.
+        "default" is the presumed answer if the user just hits <Enter>.
+            It must be "yes" (the default), "no" or None (meaning
+            an answer is required of the user).
+
+        The "answer" return value is True for "yes" or False for "no".
+        """
+        valid = {"yes": True, "y": True, "ye": True,
+                 "no": False, "n": False}
+        if default is None:
+            prompt = " [y/n] "
+        elif default == "yes":
+            prompt = " [Y/n] "
+        elif default == "no":
+            prompt = " [y/N] "
+        else:
+            raise ValueError("invalid default answer: '%s'" % default)
+
+        while True:
+            print(question + prompt)
+            choice = input().lower()
+            if default is not None and choice == '':
+                return valid[default]
+            elif choice in valid:
+                return valid[choice]
+            else:
+                sys.stdout.write("Please respond with 'yes' or 'no' "
+                                 "(or 'y' or 'n').\n")
 
 
 if __name__ == '__main__':
