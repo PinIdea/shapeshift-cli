@@ -22,22 +22,20 @@ positional arguments:
   refund_address     address to return deposit to if anything goes wrong with
                      exchange
   amount_to_be_sent  the amount to be sent to the withdrawal address
-  wallet_cli         the path or the excutable command of your wallet client,
+  wallet_cli         the path or the executable command of your wallet client,
                      such as: dash-cli bitcoin-cli
 
 optional arguments:
   -h, --help         show this help message and exit
-  -y                 attemp to proceed without prompting for
+  -y                 attempt to proceed without prompting for
 
 EXAMPLES
 		./shapeshift-cli.py DASH_BTC <withdraw_address> <refund_address> 1.5 dash-cli
 		trade DASH for 1.5 BTC. use dash-cli
 ```
 
-#TODO
-
-Automatically split larger amount to separated and rather small transactions that
-within shapeshift's limits.
+- Trade amount larger than max deposit limit will be automatically split to separated
+and rather small transactions that within shapeshift's limits.
 
 #Disclamer:
 

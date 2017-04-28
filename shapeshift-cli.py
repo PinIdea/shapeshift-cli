@@ -25,6 +25,7 @@ from urllib.request import urlopen, Request
 from json import loads, dumps
 from subprocess import call
 import time
+import math
 import sys
 import argparse
 
@@ -62,7 +63,7 @@ class ShapeShiftCmd:
         parser = argparse.ArgumentParser(
             description='exchange cyrptocurrencies using command line interface with ShapeShift.io')
         parser.add_argument('-y', action='store_true', dest='skip_confirmation', default=False,
-                            help='attemp to proceed without prompting for confirmation')
+                            help='attempt to proceed without prompting for confirmation')
         parser.add_argument('pair_to_exchange', type=str,
                             help="what coins are being exchanged in the form [input coin]_[output coin]  ie DASH_BTC")
         parser.add_argument('withdraw_address', type=str,
@@ -72,7 +73,7 @@ class ShapeShiftCmd:
         parser.add_argument('amount_to_be_exchanged', type=float,
                             help='the amount to be sent to the withdrawal address')
         parser.add_argument('wallet_cli', type=str, nargs='?',
-                            help="the path or excutable command of your wallet client, such as: dash-cli bitcoin-cli")
+                            help="the path or executable command of your wallet client, such as: dash-cli bitcoin-cli")
 
         args = parser.parse_args()
 
@@ -120,60 +121,73 @@ class ShapeShiftCmd:
                                                            .format(withdraw_address), "no"):
             self.safe_exit()
 
+        # print market price and deposit limit
         try:
             print("[+] Printing ShapeShift.io market price for {0}/{1}".format(pair_to_exchange.split("_")[0],
                                                                                pair_to_exchange.split("_")[1]))
-            print(" |-> Done ... Printing:")
-            self.print_market_info_pair(self.url_market, pair_to_exchange)
+            rate, limit_deposit, min_deposit, miner_fees, max_limit = self.return_market_info(
+                self.url_market, pair_to_exchange)
+            print(" |\t\t {0}/{1}".format(pair_to_exchange.split("_")
+                                          [0], pair_to_exchange.split("_")[1]))
+            print(" ---------------------------------------------------")
+            print(" | Rate \t\t:\t{0}".format(rate))
+            print(" | Limit(Quick)  \t:\t{0}".format(limit_deposit))
+            print(" | Limit(Precise)  \t:\t{0}".format(max_limit))
+            print(" | Deposit minimum\t:\t{0}".format(min_deposit))
+            print(" | Miner fees     \t:\t{0}".format(miner_fees))
+            print(" ---------------------------------------------------")
         except Exception as ex:
             print("Cannot print ShapeShift.io market for pairs")
             print("Program will exit")
             self.safe_exit()
 
-        try:
-            deposit_address, deposit_amount, depositType = \
-                self.post_exchange_request(self.url_send_amount, pair_to_exchange,
-                                           withdraw_address, amount_to_be_exchanged,
-                                           refund_address)
+        safe_amount_to_be_exchanged_each_time = math.floor(
+            max_limit * rate * 900) / 1000
 
-            # check wallet cli existense
-            if wallet_cli is not None:
-                print(
-                    "Excuting: dash-cli sendtoaddress \"{0}\" {1}".format(deposit_address, deposit_amount))
-                ret = call([wallet_cli, "sendtoaddress",
-                            deposit_address, deposit_amount])
-                if ret != 0:
-                    if ret < 0:
-                        print("Killed by signal", -ret)
+        while Ture:
+            try:
+                if amount_to_be_exchanged <= 0:
+                    break
+
+                amount_of_this_round = amount_to_be_exchanged
+                if safe_amount_to_be_exchanged_each_time < amount_to_be_exchanged:
+                    amount_of_this_round = safe_amount_to_be_exchanged_each_time
+
+                deposit_address, deposit_amount, depositType = \
+                    self.post_exchange_request(self.url_send_amount, pair_to_exchange,
+                                               withdraw_address, amount_of_this_round,
+                                               refund_address)
+
+                print(" ---------------------------------------------------")
+                # check wallet cli existense
+                if wallet_cli is not None:
+                    print(
+                        " | Excuting: dash-cli sendtoaddress \"{0}\" {1}".format(deposit_address, deposit_amount))
+                    ret = call([wallet_cli, "sendtoaddress",
+                                deposit_address, deposit_amount])
+                    if ret != 0:
+                        if ret < 0:
+                            print("Killed by signal", -ret)
+                        else:
+                            print("Command failed with return code", ret)
                     else:
-                        print("Command failed with return code", ret)
+                        print("SUCCESS!!")
                 else:
-                    print("SUCCESS!!")
-            else:
-                print("---------------------------------------------------")
-                print("Please deposit \x1B[31;10m{2}\x1B[0m {1} to this address:\t \x1B[31; 10m{0}\x1B[0m."
-                      .format(deposit_address, depositType, deposit_amount))
-                print("---------------------------------------------------")
+                    print("[+] Please deposit \x1B[31;10m{2}\x1B[0m {1} to this address:\t \x1B[31; 10m{0}\x1B[0m."
+                          .format(deposit_address, depositType, deposit_amount))
 
-            self.transaction_status(self.url_tx_status, deposit_address)
-        except Exception as ex:
-            print("Error: " + ex)
-            print("Cannot figure the transaction status.\nProgram will exit")
-            self.safe_exit()
+                print(" ---------------------------------------------------")
+                amount_already_sent = self.transaction_status(
+                    self.url_tx_status, deposit_address)
+                if amount_already_sent is not None:
+                    amount_to_be_exchanged -= amount_already_sent
+                else:
+                    break
 
-    def print_market_info_pair(self, url, pair_to_exchange):
-        """
-        """
-        rate, limit_deposit, min_deposit, miner_fees = self.return_market_info(
-            self.url_market, pair_to_exchange)
-        print("|\t\t {0}/{1}".format(pair_to_exchange.split("_")
-                                     [0], pair_to_exchange.split("_")[1]))
-        print("---------------------------------------------------")
-        print("| Rate \t\t\t:\t{0}".format(rate))
-        print("| Limit deposit  \t:\t{0}".format(limit_deposit))
-        print("| Deposit minimum\t:\t{0}".format(min_deposit))
-        print("| Miner fees     \t:\t{0}".format(miner_fees))
-        print("---------------------------------------------------")
+            except Exception as ex:
+                print("Error: " + ex)
+                print("Cannot figure the transaction status.\nProgram will exit")
+                self.safe_exit()
 
     def check_valid_pair(self, u_input, u_exchange, pairs):
         """
@@ -248,10 +262,8 @@ class ShapeShiftCmd:
         """
         """
         data = self.load_url_data(url + pair)
-        rate, limit_deposit, min_deposit, miner_fees = data[
-            "rate"], data["limit"], data["minimum"], data["minerFee"]
 
-        return rate, limit_deposit, min_deposit, miner_fees
+        return data["rate"], data["limit"], data["minimum"], data["minerFee"], data["maxLimit"]
 
     def return_deposit_limit(self, url, pair):
         """
@@ -289,13 +301,13 @@ class ShapeShiftCmd:
         data_o = loads(content.decode("UTF-8"))
         data = data_o["success"]
 
-        print("Deposit \x1B[31;10m{0}\x1B[0m {1} to this address:\t \x1B[31;10m{2}\x1B[0m,".format(
+        print(" | Deposit \x1B[31;10m{0}\x1B[0m {1} to this address:\t \x1B[31;10m{2}\x1B[0m,".format(
             data["depositAmount"], depositType, data["deposit"]))
 
-        print("Your \x1B[33;10m{0}\x1B[0m {1} will be send to this address:\t \x1B[37;10m{2}\x1B[0m".format(
+        print(" | Your \x1B[33;10m{0}\x1B[0m {1} will be send to this address:\t \x1B[37;10m{2}\x1B[0m".format(
             data["withdrawalAmount"], withdrawType, data["withdrawal"]))
         if return_address is not None:
-            print("Your {0} refund address is:\t \x1B[37;10m{1}\x1B[0m".format(
+            print(" | Your {0} refund address is:\t\t \x1B[37;10m{1}\x1B[0m".format(
                 depositType, return_address))
 
         return data["deposit"], data["depositAmount"], depositType
@@ -334,9 +346,10 @@ class ShapeShiftCmd:
 [-] You'll have: {4}{5}\n\
 [-] Transaction ID: {6}".format(data["address"], data["withdraw"], data["incomingCoin"],
                                 data["incomingType"], data["outgoingCoin"], data["outgoingType"], data["transaction"]))
+                return data["outgoingCoin"]
                 break
             else:
-                print("unknown transaction status:", data["status"])
+                print("[-]unknown transaction status:", data["status"])
 
             sleeping_time_sec += 5
             time.sleep(5)
