@@ -275,7 +275,9 @@ class ShapeShiftCmd:
         depositType, withdrawType = pair.split("_")
 
         post_data = {"pair": pair, "withdrawal": withdraw_add, "returnAddress": return_address,
-                     "destTag": dest_tag, "rsAdress": rs_address, "amount": amount}
+                     "destTag": dest_tag, "rsAdress": rs_address, "amount": amount,
+                     "apiKey": "6a76627d7b5418277b431f6dd2b4c2e01a4db6fccd2dcc4b9545f82c7e314" +
+                     "5d3e666517a76d884354a3815ddb9ee85f19e77bfc14cc9a83a968a218dd36d58fc"}
 
         json_data = dumps(post_data).encode("UTF-8")
         request = Request(url, data=json_data, headers={
