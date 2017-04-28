@@ -157,7 +157,7 @@ class ShapeShiftCmd:
                 if safe_amount_to_be_exchanged_each_time < amount_to_be_exchanged:
                     amount_of_this_round = safe_amount_to_be_exchanged_each_time
 
-                print("[+] initiate transaction for {0} this round. {1} in total."
+                print("[+] {1} left to be aqquired. initiate transaction for {0} this round."
                       .format(amount_of_this_round, amount_to_be_exchanged))
 
                 deposit_address, deposit_amount, depositType = \

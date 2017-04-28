@@ -2,7 +2,7 @@
 
 Exchange cryptocurrencies using command line interface with ShapeShift.io
 
-#Dependencies:
+# Dependencies:
 
 Python3
 
@@ -13,7 +13,7 @@ usage: shapeshift-cli.py [-h] [-y]
                          pair_to_exchange withdraw_address refund_address
                          amount_to_be_sent [wallet_cli]
 
-exchange cryptocurrencies using command line interface with ShapeShift.io
+Exchange cryptocurrencies using command line interface with ShapeShift.io
 
 positional arguments:
   pair_to_exchange   what coins are being exchanged in the form [input
