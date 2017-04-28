@@ -1,6 +1,6 @@
 # shapeshift-cli
 
-Exchange cyrptocurrencies using command line interface with ShapeShift.io
+Exchange cryptocurrencies using command line interface with ShapeShift.io
 
 #Dependencies:
 
@@ -13,7 +13,7 @@ usage: shapeshift-cli.py [-h] [-y]
                          pair_to_exchange withdraw_address refund_address
                          amount_to_be_sent [wallet_cli]
 
-exchange cyrptocurrencies using command line interface with ShapeShift.io
+exchange cryptocurrencies using command line interface with ShapeShift.io
 
 positional arguments:
   pair_to_exchange   what coins are being exchanged in the form [input
@@ -37,9 +37,9 @@ EXAMPLES
 - Trade amount larger than max deposit limit will be automatically split to separated
 and rather small transactions that within shapeshift's limits.
 
-#Disclamer:
+# Disclaimer:
 
-Don't use it if you want to exchange Coin/NXT or NXT/Coin. This script doen't support NXT yet.
+Don't use it if you want to exchange Coin/NXT or NXT/Coin. This script doesn't support NXT yet.
 
 If you want to see your transaction status within ShapeShift.io website, please visit this link after the generation of a deposit address:
 https://shapeshift.io/txStat/ [generated deposit address]

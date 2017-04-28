@@ -61,7 +61,7 @@ class ShapeShiftCmd:
         pair_to_exchange, withdraw_address, deposit_address, refund_address = "", "", "", ""
 
         parser = argparse.ArgumentParser(
-            description='exchange cyrptocurrencies using command line interface with ShapeShift.io')
+            description='exchange cryptocurrencies using command line interface with ShapeShift.io')
         parser.add_argument('-y', action='store_true', dest='skip_confirmation', default=False,
                             help='attempt to proceed without prompting for confirmation')
         parser.add_argument('pair_to_exchange', type=str,
@@ -144,14 +144,21 @@ class ShapeShiftCmd:
         safe_amount_to_be_exchanged_each_time = math.floor(
             max_limit * rate * 900) / 1000
 
-        while Ture:
+        while True:
             try:
-                if amount_to_be_exchanged <= 0:
-                    break
 
                 amount_of_this_round = amount_to_be_exchanged
+
+                if amount_of_this_round / rate <= min_deposit:
+                    print(" |-> {0} less than minimum requirement:{1}"
+                          .format(amount_to_be_exchanged, min_deposit))
+                    break
+
                 if safe_amount_to_be_exchanged_each_time < amount_to_be_exchanged:
                     amount_of_this_round = safe_amount_to_be_exchanged_each_time
+
+                print("[+] initiate transaction for {0} this round. {1} in total."
+                      .format(amount_of_this_round, amount_to_be_exchanged))
 
                 deposit_address, deposit_amount, depositType = \
                     self.post_exchange_request(self.url_send_amount, pair_to_exchange,
@@ -173,7 +180,7 @@ class ShapeShiftCmd:
                     else:
                         print("SUCCESS!!")
                 else:
-                    print("[+] Please deposit \x1B[31;10m{2}\x1B[0m {1} to this address:\t \x1B[31; 10m{0}\x1B[0m."
+                    print("[+] Please deposit \x1B[31;10m{2}\x1B[0m {1} to this address:\t \x1B[31;10m{0}\x1B[0m"
                           .format(deposit_address, depositType, deposit_amount))
 
                 print(" ---------------------------------------------------")
@@ -328,28 +335,27 @@ class ShapeShiftCmd:
                 remaning_sec = 600 - sleeping_time_sec
                 m, s = divmod(remaning_sec, 60)
                 remaning_minutes = "%02d:%02d" % (m, s)
-                msg = r'Waiting the deposit to this address: {0}			ETA: {1}'.format(
+                msg = r' | Waiting the deposit to this address: {0}			ETA: {1}'.format(
                     data["address"], remaning_minutes)
                 print("\r{0}".format(msg), end="")
 
             elif data["status"] == "received":
-                msg = r'We see a new deposit but we have not finished it!. Please wait...{0}'.format(
-                    35 * " ")
+                msg = r' | We see a new deposit but we have not finished it!. Please wait...{0}'.format(
+                    44 * " ")
                 print("\r{0}".format(msg), end="")
 
             elif data["status"] == "complete":
-                print("\nDeposit complete!")
-                print("Transaction info:")
+                print("\n |-> Transaction complete!")
                 print("[-] You've made a deposit to this address: {0}\n\
 [-] Withdrawal address: {1}\n\
 [-] You've desposit: {2}{3}\n\
 [-] You'll have: {4}{5}\n\
 [-] Transaction ID: {6}".format(data["address"], data["withdraw"], data["incomingCoin"],
                                 data["incomingType"], data["outgoingCoin"], data["outgoingType"], data["transaction"]))
-                return data["outgoingCoin"]
+                return float(data["outgoingCoin"])
                 break
             else:
-                print("[-]unknown transaction status:", data["status"])
+                print("[-] unknown transaction status:", data["status"])
 
             sleeping_time_sec += 5
             time.sleep(5)
