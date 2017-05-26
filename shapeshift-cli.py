@@ -169,7 +169,7 @@ class ShapeShiftCmd:
                 # check wallet cli existense
                 if wallet_cli is not None:
                     print(
-                        " | Excuting: dash-cli sendtoaddress \"{0}\" {1}".format(deposit_address, deposit_amount))
+                        " | Excuting: {2} sendtoaddress \"{0}\" {1}".format(deposit_address, deposit_amount, wallet_cli))
                     ret = call([wallet_cli, "sendtoaddress",
                                 deposit_address, deposit_amount])
                     if ret != 0:
